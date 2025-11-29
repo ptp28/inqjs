@@ -1,0 +1,19 @@
+# Development files
+tests/
+examples/
+*.test.ts
+*.test.js
+
+# Config files
+tsconfig.json
+vitest.config.ts
+.gitignore
+
+# Source files (we only publish dist/)
+src/
+
+# Artifacts
+.gemini/
+
+# Node
+node_modules/

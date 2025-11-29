@@ -1,0 +1,47 @@
+{
+  "name": "inqjs",
+  "version": "1.0.0",
+  "description": "A lightweight, dependency-free LINQ engine for TypeScript and JavaScript with comprehensive query capabilities",
+  "main": "dist/src/Query.js",
+  "types": "dist/src/Query.d.ts",
+  "files": [
+    "dist/src/**/*",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "prepublishOnly": "npm run build && npm test"
+  },
+  "keywords": [
+    "linq",
+    "query",
+    "typescript",
+    "javascript",
+    "functional",
+    "lazy-evaluation",
+    "async",
+    "json",
+    "set-operations"
+  ],
+  "author": "Parth Parikh",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ptp28/inqjs.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ptp28/inqjs/issues"
+  },
+  "homepage": "https://github.com/ptp28/inqjs#readme",
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.14"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}
