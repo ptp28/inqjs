@@ -36,6 +36,3 @@ yarn-error.log*
 *.tmp
 .cache/
 .temp/
-
-# AI artifacts (optional - keep for development)
-.gemini/

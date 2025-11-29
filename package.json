@@ -1,11 +1,11 @@
 {
   "name": "inqjs",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "A lightweight, dependency-free LINQ engine for TypeScript and JavaScript with comprehensive query capabilities",
-  "main": "dist/src/Query.js",
-  "types": "dist/src/Query.d.ts",
+  "main": "dist/Query.js",
+  "types": "dist/Query.d.ts",
   "files": [
-    "dist/src/**/*",
+    "dist/**/*",
     "README.md",
     "LICENSE"
   ],
