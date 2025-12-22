@@ -158,3 +158,5 @@ export function from<T>(source: Iterable<T>): Query<T> {
 
 // JSON helpers
 export { fromJson, fromJsonArray, fromJsonObject } from './json/fromJson';
+export { fromAsync } from './async/AsyncQuery';
+

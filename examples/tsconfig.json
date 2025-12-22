@@ -1,0 +1,17 @@
+{
+    "extends": "../tsconfig.json",
+    "compilerOptions": {
+        "baseUrl": "..",
+        "paths": {
+            "inqjs": [
+                "src/Query.ts"
+            ]
+        },
+        "noEmit": true,
+        "rootDir": ".."
+    },
+    "include": [
+        "."
+    ],
+    "exclude": []
+}

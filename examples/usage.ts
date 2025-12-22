@@ -48,12 +48,12 @@ async function main() {
     }
 
     const asyncResult = await fromAsync(asyncRange(1, 10))
-        .where(async x => x % 2 !== 0)
-        .select(async x => x * 2)
+        .where(async (x: number) => x % 2 !== 0)
+        .select(async (x: number) => x * 2)
         .toArray();
     console.log('Async odd doubled:', asyncResult);
 
-    const asyncAny = await fromAsync(asyncRange(1, 5)).any(x => x > 3);
+    const asyncAny = await fromAsync(asyncRange(1, 5)).any((x: number) => x > 3);
     console.log('Async any > 3:', asyncAny);
 }
 
