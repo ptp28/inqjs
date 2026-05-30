@@ -2,7 +2,6 @@ import { assertIterable, assertFunction, assertInteger, assertNonNegative } from
 import { defaultComparer, identity } from './utils/comparers';
 import { where } from './operators/where';
 import { select } from './operators/select';
-import { orderBy } from './operators/orderBy';
 import { skip } from './operators/skip';
 import { distinct } from './operators/distinct';
 import { any } from './operators/any';
@@ -20,6 +19,10 @@ import { concat } from './operators/concat';
 import { union } from './operators/union';
 import { intersect } from './operators/intersect';
 import { except } from './operators/except';
+import { groupBy, Grouping } from './operators/groupBy';
+import { join } from './operators/join';
+import { selectMany } from './operators/selectMany';
+import { orderByMany, SortCriterion } from './operators/orderByMany';
 import { AsyncQuery } from './async/AsyncQuery';
 
 export class Query<T> implements Iterable<T> {
@@ -54,10 +57,48 @@ export class Query<T> implements Iterable<T> {
     public orderBy<TKey = T>(
         keySelector: (item: T) => TKey = identity as any,
         comparer: (a: TKey, b: TKey) => number = defaultComparer
-    ): Query<T> {
+    ): OrderedQuery<T> {
         if (keySelector !== undefined) assertFunction(keySelector, 'keySelector');
         if (comparer !== undefined) assertFunction(comparer, 'comparer');
-        return new Query(orderBy(this._source, keySelector, comparer));
+        return new OrderedQuery(this._source, [{ keySelector, comparer }]);
+    }
+
+    public groupBy<TKey, TElement = T>(
+        keySelector: (item: T) => TKey,
+        elementSelector: (item: T) => TElement = identity as any
+    ): Query<Grouping<TKey, TElement>> {
+        assertFunction(keySelector, 'keySelector');
+        if (elementSelector !== undefined) assertFunction(elementSelector, 'elementSelector');
+        return new Query(groupBy(this._source, keySelector, elementSelector));
+    }
+
+    public join<TInner, TKey, TResult>(
+        inner: Iterable<TInner>,
+        outerKeySelector: (item: T) => TKey,
+        innerKeySelector: (item: TInner) => TKey,
+        resultSelector: (outer: T, inner: TInner) => TResult
+    ): Query<TResult> {
+        assertIterable(inner, 'inner');
+        assertFunction(outerKeySelector, 'outerKeySelector');
+        assertFunction(innerKeySelector, 'innerKeySelector');
+        assertFunction(resultSelector, 'resultSelector');
+        return new Query(join(this._source, inner, outerKeySelector, innerKeySelector, resultSelector));
+    }
+
+    public selectMany<U>(
+        collectionSelector: (item: T, index?: number) => Iterable<U>
+    ): Query<U>;
+    public selectMany<U, R>(
+        collectionSelector: (item: T, index?: number) => Iterable<U>,
+        resultSelector: (item: T, collectionItem: U) => R
+    ): Query<R>;
+    public selectMany<U, R = U>(
+        collectionSelector: (item: T, index?: number) => Iterable<U>,
+        resultSelector?: (item: T, collectionItem: U) => R
+    ): Query<U | R> {
+        assertFunction(collectionSelector, 'collectionSelector');
+        if (resultSelector !== undefined) assertFunction(resultSelector, 'resultSelector');
+        return new Query(selectMany(this._source, collectionSelector, resultSelector));
     }
 
     public skip(count: number): Query<T> {
@@ -152,6 +193,24 @@ export class Query<T> implements Iterable<T> {
     }
 }
 
+export class OrderedQuery<T> extends Query<T> {
+    constructor(
+        private readonly _orderedSource: Iterable<T>,
+        private readonly _criteria: ReadonlyArray<SortCriterion<T>>
+    ) {
+        super(orderByMany(_orderedSource, _criteria));
+    }
+
+    public thenBy<TKey = T>(
+        keySelector: (item: T) => TKey = identity as any,
+        comparer: (a: TKey, b: TKey) => number = defaultComparer
+    ): OrderedQuery<T> {
+        if (keySelector !== undefined) assertFunction(keySelector, 'keySelector');
+        if (comparer !== undefined) assertFunction(comparer, 'comparer');
+        return new OrderedQuery(this._orderedSource, [...this._criteria, { keySelector, comparer }]);
+    }
+}
+
 export function from<T>(source: Iterable<T>): Query<T> {
     return Query.from(source);
 }
@@ -159,4 +218,4 @@ export function from<T>(source: Iterable<T>): Query<T> {
 // JSON helpers
 export { fromJson, fromJsonArray, fromJsonObject } from './json/fromJson';
 export { fromAsync } from './async/AsyncQuery';
-
+export { Grouping } from './operators/groupBy';

@@ -1,9 +1,27 @@
 {
   "name": "inqjs",
-  "version": "1.0.2",
+  "version": "2.0",
   "description": "A lightweight, dependency-free LINQ engine for TypeScript and JavaScript with comprehensive query capabilities",
   "main": "dist/Query.js",
   "types": "dist/Query.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/Query.d.ts",
+      "require": "./dist/Query.js",
+      "default": "./dist/Query.js"
+    },
+    "./async": {
+      "types": "./dist/async/AsyncQuery.d.ts",
+      "require": "./dist/async/AsyncQuery.js",
+      "default": "./dist/async/AsyncQuery.js"
+    },
+    "./json": {
+      "types": "./dist/json/fromJson.d.ts",
+      "require": "./dist/json/fromJson.js",
+      "default": "./dist/json/fromJson.js"
+    },
+    "./package.json": "./package.json"
+  },
   "files": [
     "dist/**/*",
     "README.md",
@@ -11,7 +29,9 @@
   ],
   "scripts": {
     "build": "tsc",
-    "test": "vitest run",
+    "test": "npm run build && vitest run && node tests/query.test.js",
+    "test:unit": "vitest run",
+    "test:js": "npm run build && node tests/query.test.js",
     "prepublishOnly": "npm run build && npm test"
   },
   "keywords": [

@@ -23,6 +23,17 @@ describe('Query (Sync)', () => {
         it('should handle empty source', () => {
             expect(from([]).toArray()).toEqual([]);
         });
+
+        it('should throw for non-iterable source', () => {
+            expect(() => from(123 as any)).toThrow('source must be an iterable');
+        });
+
+        it('should preserve one-shot generator semantics', () => {
+            function* gen() { yield 1; yield 2; }
+            const q = from(gen());
+            expect(q.toArray()).toEqual([1, 2]);
+            expect(q.toArray()).toEqual([]);
+        });
     });
 
     describe('Filtering', () => {
@@ -137,6 +148,10 @@ describe('Query (Sync)', () => {
 
         it('sum of empty should be 0', () => {
             expect(from([]).sum()).toBe(0);
+        });
+
+        it('sum should reject non-finite values', () => {
+            expect(() => from([1, Number.NaN]).sum()).toThrow('sum: value must be a finite number');
         });
 
         it('min should return min value', () => {

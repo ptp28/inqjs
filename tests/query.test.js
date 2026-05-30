@@ -1,23 +1,28 @@
 // Pure JavaScript tests (no TypeScript)
 // Run with: node tests/query.test.js
 
-const { from, fromJson, fromJsonArray, fromJsonObject } = require('../dist/src/Query');
-const { fromAsync } = require('../dist/src/async/AsyncQuery');
+const { from, fromJson, fromJsonArray, fromJsonObject, fromAsync } = require('../dist/Query');
+const { fromAsync: fromAsyncSubpath } = require('../dist/async/AsyncQuery');
 
 // Simple test framework
 let passed = 0;
 let failed = 0;
+const pending = [];
 
 function test(name, fn) {
-    try {
-        fn();
-        console.log(`✓ ${name}`);
-        passed++;
-    } catch (error) {
-        console.error(`✗ ${name}`);
-        console.error(`  ${error.message}`);
-        failed++;
-    }
+    const run = Promise.resolve()
+        .then(fn)
+        .then(() => {
+            console.log(`✓ ${name}`);
+            passed++;
+        })
+        .catch(error => {
+            console.error(`✗ ${name}`);
+            console.error(`  ${error.message}`);
+            failed++;
+        });
+    pending.push(run);
+    return run;
 }
 
 function assertEquals(actual, expected, message) {
@@ -48,82 +53,82 @@ console.log('=== Running JavaScript Tests ===\n');
 // Query Tests
 console.log('--- Query (Sync) Tests ---');
 
-test('should create from array', () => {
+void test('should create from array', () => {
     const result = from([1, 2, 3]).toArray();
     assertEquals(result, [1, 2, 3]);
 });
 
-test('should filter with where', () => {
+void test('should filter with where', () => {
     const result = from([1, 2, 3, 4]).where(x => x % 2 === 0).toArray();
     assertEquals(result, [2, 4]);
 });
 
-test('should transform with select', () => {
+void test('should transform with select', () => {
     const result = from([1, 2, 3]).select(x => x * 2).toArray();
     assertEquals(result, [2, 4, 6]);
 });
 
-test('should sort with orderBy', () => {
+void test('should sort with orderBy', () => {
     const result = from([3, 1, 2]).orderBy().toArray();
     assertEquals(result, [1, 2, 3]);
 });
 
-test('should skip elements', () => {
+void test('should skip elements', () => {
     const result = from([1, 2, 3, 4]).skip(2).toArray();
     assertEquals(result, [3, 4]);
 });
 
-test('should take elements', () => {
+void test('should take elements', () => {
     const result = from([1, 2, 3, 4, 5]).take(3).toArray();
     assertEquals(result, [1, 2, 3]);
 });
 
-test('should remove duplicates with distinct', () => {
+void test('should remove duplicates with distinct', () => {
     const result = from([1, 2, 2, 3]).distinct().toArray();
     assertEquals(result, [1, 2, 3]);
 });
 
-test('should check any', () => {
+void test('should check any', () => {
     const result = from([1, 2, 3]).any(x => x > 2);
     assertTrue(result === true);
 });
 
-test('should check all', () => {
+void test('should check all', () => {
     const result = from([1, 2, 3]).all(x => x > 0);
     assertTrue(result === true);
 });
 
-test('should sum numbers', () => {
+void test('should sum numbers', () => {
     const result = from([1, 2, 3]).sum();
     assertTrue(result === 6);
 });
 
-test('should count elements', () => {
+void test('should count elements', () => {
     const result = from([1, 2, 3, 4, 5]).count();
     assertTrue(result === 5);
 });
 
-test('should count with predicate', () => {
+void test('should count with predicate', () => {
     const result = from([1, 2, 3, 4, 5]).count(x => x % 2 === 0);
     assertTrue(result === 2);
 });
 
-test('should find min', () => {
+void test('should find min', () => {
     const result = from([3, 1, 2]).min();
     assertTrue(result === 1);
 });
 
-test('should find max', () => {
+void test('should find max', () => {
     const result = from([1, 3, 2]).max();
     assertTrue(result === 3);
 });
 
-test('should get first element', () => {
+void test('should get first element', () => {
     const result = from([1, 2, 3]).first();
     assertTrue(result === 1);
 });
 
-test('should chain multiple operations', () => {
+void test('should chain multiple operations', () => {
     const result = from([1, 2, 3, 4, 5, 6])
         .where(x => x % 2 === 0)
         .select(x => x * 2)
@@ -133,10 +138,47 @@ test('should chain multiple operations', () => {
     assertEquals(result, [12, 8]);
 });
 
+void test('should use groupBy, join, selectMany, and thenBy', () => {
+    const groups = from([
+        { category: 'fruit', name: 'apple' },
+        { category: 'fruit', name: 'pear' },
+        { category: 'veg', name: 'carrot' },
+    ])
+        .groupBy(x => x.category, x => x.name)
+        .select(group => [group.key, Array.from(group)])
+        .toArray();
+    assertEquals(groups, [['fruit', ['apple', 'pear']], ['veg', ['carrot']]]);
+
+    const joined = from([{ id: 1, name: 'Alice' }])
+        .join([{ userId: 1, total: 10 }], user => user.id, order => order.userId, (user, order) => `${user.name}:${order.total}`)
+        .toArray();
+    assertEquals(joined, ['Alice:10']);
+
+    const flattened = from([{ name: 'a', values: [1, 2] }])
+        .selectMany(item => item.values, (item, value) => `${item.name}${value}`)
+        .toArray();
+    assertEquals(flattened, ['a1', 'a2']);
+
+    const ordered = from([{ a: 1, b: 2 }, { a: 1, b: 1 }, { a: 0, b: 3 }])
+        .orderBy(x => x.a)
+        .thenBy(x => x.b)
+        .select(x => `${x.a}:${x.b}`)
+        .toArray();
+    assertEquals(ordered, ['0:3', '1:1', '1:2']);
+});
+
+void test('public entrypoint should expose async and JSON helpers', () => {
+    assertTrue(typeof fromAsync === 'function');
+    assertTrue(typeof fromJson === 'function');
+    assertTrue(typeof fromJsonArray === 'function');
+    assertTrue(typeof fromJsonObject === 'function');
+    assertTrue(typeof fromAsyncSubpath === 'function');
+});
+
 // JSON Tests
 console.log('\n--- JSON Query Tests ---');
 
-test('should parse JSON array', () => {
+void test('should parse JSON array', () => {
     const json = '[1, 2, 3, 4, 5]';
     const result = fromJsonArray(json)
         .where(x => x % 2 === 0)
@@ -144,7 +186,7 @@ test('should parse JSON array', () => {
     assertEquals(result, [2, 4]);
 });
 
-test('should parse JSON object', () => {
+void test('should parse JSON object', () => {
     const json = '{"a": 1, "b": 2, "c": 3}';
     const result = fromJsonObject(json)
         .where(([key, value]) => value > 1)
@@ -153,7 +195,7 @@ test('should parse JSON object', () => {
     assertEquals(result, ['b', 'c']);
 });
 
-test('should handle JSON with fromJson', () => {
+void test('should handle JSON with fromJson', () => {
     const json = '[1, 2, 3]';
     const result = fromJson(json).toArray();
     assertEquals(result, [1, 2, 3]);
@@ -193,7 +235,7 @@ async function runAsyncTests() {
 }
 
 // Run async tests and print summary
-runAsyncTests().then(() => {
+runAsyncTests().then(() => Promise.all(pending)).then(() => {
     console.log('\n=== Test Summary ===');
     console.log(`✓ Passed: ${passed}`);
     console.log(`✗ Failed: ${failed}`);

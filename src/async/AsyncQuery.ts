@@ -1,8 +1,7 @@
-import { assertFunction, assertInteger, assertNonNegative } from '../utils/guards';
+import { assertFunction, assertInteger, assertIterableLike, assertNonNegative } from '../utils/guards';
 import { defaultComparer, identity } from '../utils/comparers';
 import { whereAsync } from './operators/whereAsync';
 import { selectAsync } from './operators/selectAsync';
-import { orderByAsync } from './operators/orderByAsync';
 import { skipAsync } from './operators/skipAsync';
 import { distinctAsync } from './operators/distinctAsync';
 import { anyAsync } from './operators/anyAsync';
@@ -20,12 +19,18 @@ import { concatAsync } from './operators/concatAsync';
 import { unionAsync } from './operators/unionAsync';
 import { intersectAsync } from './operators/intersectAsync';
 import { exceptAsync } from './operators/exceptAsync';
+import { groupByAsync } from './operators/groupByAsync';
+import { joinAsync } from './operators/joinAsync';
+import { selectManyAsync } from './operators/selectManyAsync';
+import { orderByManyAsync, AsyncSortCriterion } from './operators/orderByManyAsync';
+import { Grouping } from '../operators/groupBy';
 
 export class AsyncQuery<T> implements AsyncIterable<T> {
     private readonly _source: AsyncIterable<T>;
 
-    constructor(source: AsyncIterable<T>) {
-        this._source = source;
+    constructor(source: Iterable<T> | AsyncIterable<T>) {
+        assertIterableLike(source, 'source');
+        this._source = AsyncQuery.wrap(source);
     }
 
     public [Symbol.asyncIterator](): AsyncIterator<T> {
@@ -33,12 +38,14 @@ export class AsyncQuery<T> implements AsyncIterable<T> {
     }
 
     public static from<T>(source: Iterable<T> | AsyncIterable<T>): AsyncQuery<T> {
-        async function* wrap(src: Iterable<T> | AsyncIterable<T>) {
-            for await (const item of src) {
-                yield item;
-            }
+        assertIterableLike(source, 'source');
+        return new AsyncQuery(source);
+    }
+
+    private static async *wrap<T>(source: Iterable<T> | AsyncIterable<T>): AsyncIterable<T> {
+        for await (const item of source) {
+            yield item;
         }
-        return new AsyncQuery(wrap(source));
     }
 
     public where(predicate: (item: T, index?: number) => boolean | Promise<boolean>): AsyncQuery<T> {
@@ -54,10 +61,48 @@ export class AsyncQuery<T> implements AsyncIterable<T> {
     public orderBy<TKey = T>(
         keySelector: (item: T) => TKey | Promise<TKey> = identity as any,
         comparer: (a: TKey, b: TKey) => number = defaultComparer
-    ): AsyncQuery<T> {
+    ): OrderedAsyncQuery<T> {
         if (keySelector !== undefined) assertFunction(keySelector, 'keySelector');
         if (comparer !== undefined) assertFunction(comparer, 'comparer');
-        return new AsyncQuery(orderByAsync(this._source, keySelector, comparer));
+        return new OrderedAsyncQuery(this._source, [{ keySelector, comparer }]);
+    }
+
+    public groupBy<TKey, TElement = T>(
+        keySelector: (item: T) => TKey | Promise<TKey>,
+        elementSelector: (item: T) => TElement | Promise<TElement> = identity as any
+    ): AsyncQuery<Grouping<TKey, TElement>> {
+        assertFunction(keySelector, 'keySelector');
+        if (elementSelector !== undefined) assertFunction(elementSelector, 'elementSelector');
+        return new AsyncQuery(groupByAsync(this._source, keySelector, elementSelector));
+    }
+
+    public join<TInner, TKey, TResult>(
+        inner: Iterable<TInner> | AsyncIterable<TInner>,
+        outerKeySelector: (item: T) => TKey | Promise<TKey>,
+        innerKeySelector: (item: TInner) => TKey | Promise<TKey>,
+        resultSelector: (outer: T, inner: TInner) => TResult | Promise<TResult>
+    ): AsyncQuery<TResult> {
+        assertIterableLike(inner, 'inner');
+        assertFunction(outerKeySelector, 'outerKeySelector');
+        assertFunction(innerKeySelector, 'innerKeySelector');
+        assertFunction(resultSelector, 'resultSelector');
+        return new AsyncQuery(joinAsync(this._source, inner, outerKeySelector, innerKeySelector, resultSelector));
+    }
+
+    public selectMany<U>(
+        collectionSelector: (item: T, index?: number) => Iterable<U> | AsyncIterable<U> | Promise<Iterable<U> | AsyncIterable<U>>
+    ): AsyncQuery<U>;
+    public selectMany<U, R>(
+        collectionSelector: (item: T, index?: number) => Iterable<U> | AsyncIterable<U> | Promise<Iterable<U> | AsyncIterable<U>>,
+        resultSelector: (item: T, collectionItem: U) => R | Promise<R>
+    ): AsyncQuery<R>;
+    public selectMany<U, R = U>(
+        collectionSelector: (item: T, index?: number) => Iterable<U> | AsyncIterable<U> | Promise<Iterable<U> | AsyncIterable<U>>,
+        resultSelector?: (item: T, collectionItem: U) => R | Promise<R>
+    ): AsyncQuery<U | R> {
+        assertFunction(collectionSelector, 'collectionSelector');
+        if (resultSelector !== undefined) assertFunction(resultSelector, 'resultSelector');
+        return new AsyncQuery(selectManyAsync(this._source, collectionSelector, resultSelector));
     }
 
     public skip(count: number): AsyncQuery<T> {
@@ -124,26 +169,48 @@ export class AsyncQuery<T> implements AsyncIterable<T> {
         return new AsyncQuery(prependAsync(this._source, element));
     }
 
-    public concat(other: AsyncIterable<T>): AsyncQuery<T> {
+    public concat(other: Iterable<T> | AsyncIterable<T>): AsyncQuery<T> {
+        assertIterableLike(other, 'other');
         return new AsyncQuery(concatAsync(this._source, other));
     }
 
-    public union<TKey = T>(other: AsyncIterable<T>, keySelector: (item: T) => TKey | Promise<TKey> = identity as any): AsyncQuery<T> {
+    public union<TKey = T>(other: Iterable<T> | AsyncIterable<T>, keySelector: (item: T) => TKey | Promise<TKey> = identity as any): AsyncQuery<T> {
+        assertIterableLike(other, 'other');
         if (keySelector !== undefined) assertFunction(keySelector, 'keySelector');
         return new AsyncQuery(unionAsync(this._source, other, keySelector));
     }
 
-    public intersect<TKey = T>(other: AsyncIterable<T>, keySelector: (item: T) => TKey | Promise<TKey> = identity as any): AsyncQuery<T> {
+    public intersect<TKey = T>(other: Iterable<T> | AsyncIterable<T>, keySelector: (item: T) => TKey | Promise<TKey> = identity as any): AsyncQuery<T> {
+        assertIterableLike(other, 'other');
         if (keySelector !== undefined) assertFunction(keySelector, 'keySelector');
         return new AsyncQuery(intersectAsync(this._source, other, keySelector));
     }
 
-    public except<TKey = T>(other: AsyncIterable<T>, keySelector: (item: T) => TKey | Promise<TKey> = identity as any): AsyncQuery<T> {
+    public except<TKey = T>(other: Iterable<T> | AsyncIterable<T>, keySelector: (item: T) => TKey | Promise<TKey> = identity as any): AsyncQuery<T> {
+        assertIterableLike(other, 'other');
         if (keySelector !== undefined) assertFunction(keySelector, 'keySelector');
         return new AsyncQuery(exceptAsync(this._source, other, keySelector));
     }
 }
 
-export function fromAsync<T>(source: AsyncIterable<T>): AsyncQuery<T> {
+export class OrderedAsyncQuery<T> extends AsyncQuery<T> {
+    constructor(
+        private readonly _orderedSource: AsyncIterable<T>,
+        private readonly _criteria: ReadonlyArray<AsyncSortCriterion<T>>
+    ) {
+        super(orderByManyAsync(_orderedSource, _criteria));
+    }
+
+    public thenBy<TKey = T>(
+        keySelector: (item: T) => TKey | Promise<TKey> = identity as any,
+        comparer: (a: TKey, b: TKey) => number = defaultComparer
+    ): OrderedAsyncQuery<T> {
+        if (keySelector !== undefined) assertFunction(keySelector, 'keySelector');
+        if (comparer !== undefined) assertFunction(comparer, 'comparer');
+        return new OrderedAsyncQuery(this._orderedSource, [...this._criteria, { keySelector, comparer }]);
+    }
+}
+
+export function fromAsync<T>(source: Iterable<T> | AsyncIterable<T>): AsyncQuery<T> {
     return AsyncQuery.from(source);
 }

@@ -1,6 +1,6 @@
 export async function* unionAsync<T, TKey = T>(
     source: AsyncIterable<T>,
-    other: AsyncIterable<T>,
+    other: Iterable<T> | AsyncIterable<T>,
     keySelector: (item: T) => TKey | Promise<TKey> = ((x: T) => x) as any
 ): AsyncIterable<T> {
     const seen = new Set<TKey>();

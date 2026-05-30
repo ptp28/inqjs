@@ -12,14 +12,15 @@ A lightweight, dependency-free LINQ engine for TypeScript and JavaScript with co
 
 ✨ **Comprehensive LINQ Operations**
 - Filtering: `where`, `distinct`
-- Projection: `select`
-- Ordering: `orderBy`
+- Projection: `select`, `selectMany`
+- Ordering: `orderBy`, `thenBy`
 - Partitioning: `skip`, `take`
 - Aggregation: `sum`, `min`, `max`, `count`
 - Quantifiers: `any`, `all`
 - Element: `first`
 - Set Operations: `union`, `intersect`, `except`
 - Sequence: `append`, `prepend`, `concat`
+- Grouping & Joining: `groupBy`, `join`
 
 🚀 **Lazy Evaluation**
 - Operators are lazily evaluated using generators
@@ -27,7 +28,7 @@ A lightweight, dependency-free LINQ engine for TypeScript and JavaScript with co
 
 ⚡ **Async Support**
 - Full async/await support with `AsyncQuery`
-- Works with `AsyncIterable<T>`
+- Works with `Iterable<T>` and `AsyncIterable<T>`
 
 📦 **JSON Querying**
 - Query JSON data directly with `fromJson`, `fromJsonArray`, `fromJsonObject`
@@ -44,6 +45,20 @@ A lightweight, dependency-free LINQ engine for TypeScript and JavaScript with co
 
 ```bash
 npm install inqjs
+```
+
+## Imports
+
+```typescript
+import { from, fromAsync, fromJsonArray } from 'inqjs';
+import { fromAsync as fromAsyncOnly } from 'inqjs/async';
+import { fromJson } from 'inqjs/json';
+```
+
+CommonJS is supported too:
+
+```javascript
+const { from, fromAsync } = require('inqjs');
 ```
 
 ## Quick Start
@@ -122,7 +137,7 @@ from(list1).except(list2).toArray();
 ### Query Creation
 
 - `from(iterable)` - Create query from any iterable
-- `fromAsync(asyncIterable)` - Create async query
+- `fromAsync(iterableOrAsyncIterable)` - Create async query
 - `fromJson(jsonString)` - Parse and query JSON
 - `fromJsonArray(jsonString)` - Parse JSON array
 - `fromJsonObject(jsonString)` - Parse JSON object
@@ -131,13 +146,20 @@ from(list1).except(list2).toArray();
 
 - `where(predicate)` - Filter elements
 - `select(selector)` - Transform elements
+- `selectMany(collectionSelector, resultSelector?)` - Project and flatten nested sequences
 - `distinct(keySelector?)` - Remove duplicates
 
 ### Ordering & Partitioning
 
 - `orderBy(keySelector?, comparer?)` - Sort elements
+- `thenBy(keySelector?, comparer?)` - Add a secondary sort after `orderBy`
 - `skip(count)` - Skip first N elements
 - `take(count)` - Take first N elements
+
+### Grouping & Joining
+
+- `groupBy(keySelector, elementSelector?)` - Group elements by key
+- `join(inner, outerKeySelector, innerKeySelector, resultSelector)` - Inner join two sequences by matching keys
 
 ### Aggregation
 
@@ -175,16 +197,14 @@ from(list1).except(list2).toArray();
 ## Testing
 
 ```bash
-# Run TypeScript tests (Vitest)
+# Build, run TypeScript tests, and run JavaScript smoke tests
 npm test
 
-# Run JavaScript tests
-node tests/query.test.js
+# Run just the JavaScript smoke tests
+npm run test:js
 ```
 
-**Test Coverage**: 93 tests across TypeScript and JavaScript
-- 70 TypeScript tests (Vitest)
-- 23 Pure JavaScript tests
+**Test Coverage**: TypeScript unit/package smoke tests plus pure JavaScript consumer smoke tests.
 
 ## Examples
 
@@ -202,8 +222,10 @@ See the `examples/` directory for more usage examples:
 ## Limitations
 
 - `orderBy` materializes the sequence (requires full iteration to sort)
-- No `join` or `groupBy` operators (by design)
-- Set operations (`union`, `intersect`, `except`) materialize the second sequence
+- Set operations (`union`, `intersect`, `except`) store keys in memory; `intersect` and `except` read the second sequence before yielding results
+- Equality uses JavaScript `Set` semantics on each value or selected key; object values compare by reference unless you provide a `keySelector`
+- Generator-backed queries keep the source's natural behavior, so a one-shot generator can only be consumed once
+- `groupBy` and `join` materialize lookup data before yielding results
 
 ## Development
 
